@@ -11,3 +11,4 @@ Cargo.lock
 
 # Zig cache
 /**/zig-cache/
+/Rust/**/.gitignore
