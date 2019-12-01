@@ -20,6 +20,8 @@ fn part2(s: &str) -> i64 {
 }
 
 fn main() {
-    dbg!(part1(PUZZLE));
-    dbg!(part2(PUZZLE));
+    let p1 = part1(PUZZLE);
+    let p2 = part2(PUZZLE);
+
+    println!("Part 1: {}\nPart 2: {}", p1, p2);
 }
