@@ -1,4 +1,4 @@
-static PUZZLE: &'static str = include_str!("input.txt");
+static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day01.txt");
 
 mod fuel;
 use fuel::Fuel;
