@@ -60,13 +60,15 @@ fn part2(s: []const u8) !usize {
     var parsed = try parse(s);
     defer parsed.deinit();
 
+    var clone = ArrayList(usize).init(heap.direct_allocator);
+    defer clone.deinit();
+
     var noun = usize(0);
     var verb = usize(0);
 
     while (noun < 99) : ({ noun += 1; }) {
         while (verb < 99) : ({ verb += 1; }) {
-            var clone = ArrayList(usize).init(heap.direct_allocator);
-            defer clone.deinit();
+            try clone.resize(0);
             try clone.appendSlice(parsed.toSliceConst());
 
             if (run(clone.toSlice(), noun, verb) == magic_number) {
