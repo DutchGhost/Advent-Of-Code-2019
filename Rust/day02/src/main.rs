@@ -24,7 +24,7 @@ impl From<usize> for Opcode {
     }
 }
 
-fn run(mut program: Vec<usize>, noun: usize, verb: usize) -> usize {
+fn run(program: &mut [usize], noun: usize, verb: usize) -> usize {
     let mut ip = 0;
     program[1] = noun;
     program[2] = verb;
@@ -50,16 +50,23 @@ fn run(mut program: Vec<usize>, noun: usize, verb: usize) -> usize {
 }
 
 fn part1(s: &str) -> usize {
-    run(parse(s), 12, 2)
+    run(&mut parse(s), 12, 2)
 }
 
 fn part2(s: &str) -> usize {
     const MAGIC_NUMBER: usize = 19690720;
     let program = parse(s);
 
+    let mut clone = Vec::with_capacity(program.len());
+
     (0..=99)
         .flat_map(|noun| (0..=99).map(move |verb| (noun, verb)))
-        .find(|(noun, verb)| run(program.clone(), *noun, *verb) == MAGIC_NUMBER)
+        .find(|(noun, verb)| {
+            clone.clear();
+            clone.extend_from_slice(&program);
+
+            run(&mut clone, *noun, *verb) == MAGIC_NUMBER
+        })
         .map(|(noun, verb)| 100 * noun + verb)
         .unwrap()
 }
