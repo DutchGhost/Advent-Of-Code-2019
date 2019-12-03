@@ -8,7 +8,7 @@ enum Instruction {
     Up(usize),
 }
 
-fn parse(s: &str) -> (Vec<Instruction>, Vec<Instruction>) {
+fn parse<'a>(s: &'a str) -> (impl Iterator<Item = Instruction> + 'a, impl Iterator<Item = Instruction> + 'a ) {
     let mut lines = s.lines();
 
     let first = lines.next().unwrap();
@@ -24,10 +24,10 @@ fn parse(s: &str) -> (Vec<Instruction>, Vec<Instruction>) {
         }
     };
 
-    let first = first.split(",").map(mapfn).collect::<Vec<_>>();
+    let first = first.split(",").map(mapfn);
 
     let second = lines.next().unwrap();
-    let second = second.split(",").map(mapfn).collect::<Vec<_>>();
+    let second = second.split(",").map(mapfn);
 
     (first, second)
 }
@@ -97,13 +97,13 @@ fn sort<T: Ord>(t1: T, t2: T) -> (T, T) {
 fn make_map<'a>(
     x: &'a mut isize,
     y: &'a mut isize,
-    slice: &'a [Instruction],
+    iter: impl Iterator<Item = Instruction> + 'a,
 ) -> impl Iterator<Item = Point> + 'a {
-    slice.iter().map(move |ins| {
+    iter.map(move |ins| {
         let (old_x, old_y) = (*x, *y);
         match ins {
             Instruction::Down(n) => {
-                *y -= *n as isize;
+                *y -= n as isize;
                 Point::Vertical {
                     x: old_x,
                     y: old_y,
@@ -111,7 +111,7 @@ fn make_map<'a>(
                 }
             }
             Instruction::Up(n) => {
-                *y += *n as isize;
+                *y += n as isize;
                 Point::Vertical {
                     x: old_x,
                     y: old_y,
@@ -119,7 +119,7 @@ fn make_map<'a>(
                 }
             }
             Instruction::Right(n) => {
-                *x += *n as isize;
+                *x += n as isize;
                 Point::Horizontal {
                     y: *y,
                     x: old_x,
@@ -127,7 +127,7 @@ fn make_map<'a>(
                 }
             }
             Instruction::Left(n) => {
-                *x -= *n as isize;
+                *x -= n as isize;
                 Point::Horizontal {
                     y: *y,
                     x: old_x,
@@ -142,10 +142,10 @@ fn main() {
     let (first, second) = parse(PUZZLE);
 
     let (mut x, mut y) = (0, 0);
-    let first_map = make_map(&mut x, &mut y, &first).collect::<Vec<_>>();
+    let first_map = make_map(&mut x, &mut y, first).collect::<Vec<_>>();
 
     let (mut x, mut y) = (0, 0);
-    let p1 = make_map(&mut x, &mut y, &second)
+    let p1 = make_map(&mut x, &mut y, second)
         .filter_map(move |elem| elem.intersect(&first_map).min())
         .min();
 
