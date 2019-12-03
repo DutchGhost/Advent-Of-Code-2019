@@ -94,59 +94,59 @@ fn sort<T: Ord>(t1: T, t2: T) -> (T, T) {
     }
 }
 
-fn make_map(slice: &[Instruction]) -> Vec<Point> {
-    let (mut x, mut y) = (0isize, 0isize);
-    slice
-        .iter()
-        .map(|ins| {
-            let (old_x, old_y) = (x, y);
-            match ins {
-                Instruction::Down(n) => {
-                    y -= *n as isize;
-                    Point::Vertical {
-                        x: old_x,
-                        y: old_y,
-                        dy: y,
-                    }
-                }
-                Instruction::Up(n) => {
-                    y += *n as isize;
-                    Point::Vertical {
-                        x: old_x,
-                        y: old_y,
-                        dy: y,
-                    }
-                }
-                Instruction::Right(n) => {
-                    x += *n as isize;
-                    Point::Horizontal {
-                        y: y,
-                        x: old_x,
-                        dx: x,
-                    }
-                }
-                Instruction::Left(n) => {
-                    x -= *n as isize;
-                    Point::Horizontal {
-                        y: y,
-                        x: old_x,
-                        dx: x,
-                    }
+fn make_map<'a>(
+    x: &'a mut isize,
+    y: &'a mut isize,
+    slice: &'a [Instruction],
+) -> impl Iterator<Item = Point> + 'a {
+    slice.iter().map(move |ins| {
+        let (old_x, old_y) = (*x, *y);
+        match ins {
+            Instruction::Down(n) => {
+                *y -= *n as isize;
+                Point::Vertical {
+                    x: old_x,
+                    y: old_y,
+                    dy: *y,
                 }
             }
-        })
-        .collect::<Vec<_>>()
+            Instruction::Up(n) => {
+                *y += *n as isize;
+                Point::Vertical {
+                    x: old_x,
+                    y: old_y,
+                    dy: *y,
+                }
+            }
+            Instruction::Right(n) => {
+                *x += *n as isize;
+                Point::Horizontal {
+                    y: *y,
+                    x: old_x,
+                    dx: *x,
+                }
+            }
+            Instruction::Left(n) => {
+                *x -= *n as isize;
+                Point::Horizontal {
+                    y: *y,
+                    x: old_x,
+                    dx: *x,
+                }
+            }
+        }
+    })
 }
 
 fn main() {
     let (first, second) = parse(PUZZLE);
 
-    let first_map = make_map(&first);
-    let second_map = make_map(&second);
+    let (mut x, mut y) = (0, 0);
+    let first_map = make_map(&mut x, &mut y, &first).collect::<Vec<_>>();
 
-    let p1 = second_map
-        .iter()
-        .flat_map(|elem| elem.intersect(&first_map))
+    let (mut x, mut y) = (0, 0);
+    let p1 = make_map(&mut x, &mut y, &second)
+        .filter_map(move |elem| elem.intersect(&first_map).min())
         .min();
 
     println!("Part 1:  {:?}", p1);
