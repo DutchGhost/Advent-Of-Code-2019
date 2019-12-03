@@ -40,12 +40,12 @@ fn parse<'a>(
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Point {
+enum Segment {
     Horizontal { x: isize, dx: isize, y: isize },
     Vertical { x: isize, y: isize, dy: isize },
 }
 
-impl Point {
+impl Segment {
     fn contains_x(&self, check_x: isize) -> bool {
         match self {
             Self::Horizontal { x, dx, .. } => {
@@ -103,17 +103,17 @@ fn sort<T: Ord>(t1: T, t2: T) -> (T, T) {
     }
 }
 
-fn make_map<'a>(
+fn segments<'a>(
     x: &'a mut isize,
     y: &'a mut isize,
     iter: impl Iterator<Item = Instruction> + 'a,
-) -> impl Iterator<Item = Point> + 'a {
+) -> impl Iterator<Item = Segment> + 'a {
     iter.map(move |ins| {
         let (old_x, old_y) = (*x, *y);
         match ins {
             Instruction::Down(n) => {
                 *y -= n as isize;
-                Point::Vertical {
+                Segment::Vertical {
                     x: old_x,
                     y: old_y,
                     dy: *y,
@@ -121,7 +121,7 @@ fn make_map<'a>(
             }
             Instruction::Up(n) => {
                 *y += n as isize;
-                Point::Vertical {
+                Segment::Vertical {
                     x: old_x,
                     y: old_y,
                     dy: *y,
@@ -129,7 +129,7 @@ fn make_map<'a>(
             }
             Instruction::Right(n) => {
                 *x += n as isize;
-                Point::Horizontal {
+                Segment::Horizontal {
                     y: *y,
                     x: old_x,
                     dx: *x,
@@ -137,7 +137,7 @@ fn make_map<'a>(
             }
             Instruction::Left(n) => {
                 *x -= n as isize;
-                Point::Horizontal {
+                Segment::Horizontal {
                     y: *y,
                     x: old_x,
                     dx: *x,
@@ -151,10 +151,10 @@ fn part1(s: &str) -> isize {
     let (first, second) = parse(s);
 
     let (mut x, mut y) = (0, 0);
-    let first_map = make_map(&mut x, &mut y, first).collect::<Vec<_>>();
+    let first_map = segments(&mut x, &mut y, first).collect::<Vec<_>>();
 
     let (mut x, mut y) = (0, 0);
-    make_map(&mut x, &mut y, second)
+    segments(&mut x, &mut y, second)
         .filter_map(move |elem| elem.intersect(first_map.iter()).min())
         .min()
         .unwrap()
