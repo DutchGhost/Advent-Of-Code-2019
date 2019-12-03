@@ -1,0 +1,153 @@
+static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day03.txt");
+
+#[derive(Debug)]
+enum Instruction {
+    Right(usize),
+    Down(usize),
+    Left(usize),
+    Up(usize),
+}
+
+fn parse(s: &str) -> (Vec<Instruction>, Vec<Instruction>) {
+    let mut lines = s.lines();
+
+    let first = lines.next().unwrap();
+
+    let mapfn = |ins: &str| {
+        let num = ins[1..].parse::<usize>().unwrap();
+        match ins.chars().next().unwrap() {
+            'U' => Instruction::Up(num),
+            'D' => Instruction::Down(num),
+            'L' => Instruction::Left(num),
+            'R' => Instruction::Right(num),
+            _ => panic!("INVALID INSTRUCTION"),
+        }
+    };
+
+    let first = first.split(",").map(mapfn).collect::<Vec<_>>();
+
+    let second = lines.next().unwrap();
+    let second = second.split(",").map(mapfn).collect::<Vec<_>>();
+
+    (first, second)
+}
+
+#[derive(Copy, Clone, Debug)]
+enum Point {
+    Horizontal { x: isize, dx: isize, y: isize },
+    Vertical { x: isize, y: isize, dy: isize },
+}
+
+impl Point {
+    fn contains_x(&self, check_x: isize) -> bool {
+        match self {
+            Self::Horizontal { x, dx, y } => {
+                let (x, dx) = sort(x, dx);
+
+                *x <= check_x && check_x <= *dx
+            }
+            Self::Vertical { x, y, dy } => *x == check_x,
+        }
+    }
+
+    fn contains_y(&self, check_y: isize) -> bool {
+        match self {
+            Self::Horizontal { x, dx, y } => *y == check_y,
+            Self::Vertical { x, y, dy } => {
+                let (y, dy) = sort(y, dy);
+
+                *y <= check_y && check_y <= *dy
+            }
+        }
+    }
+
+    fn intersect<'a>(&'a self, list: &'a [Self]) -> impl Iterator<Item = isize> + 'a {
+        list.iter()
+            .filter(move |item| match item {
+                Self::Horizontal { y, .. } => match self {
+                    Self::Vertical { x, .. } => self.contains_y(*y) && item.contains_x(*x),
+                    _ => false,
+                },
+                Self::Vertical { x, .. } => match self {
+                    Self::Horizontal { y, .. } => self.contains_x(*x) && item.contains_y(*y),
+                    _ => false,
+                },
+            })
+            .map(move |item| match item {
+                Self::Horizontal { y, .. } => match self {
+                    Self::Vertical { x, .. } => y.abs() + x.abs(),
+                    _ => unreachable!(),
+                },
+                Self::Vertical { x, .. } => match self {
+                    Self::Horizontal { y, .. } => y.abs() + x.abs(),
+                    _ => unreachable!(),
+                },
+            })
+    }
+}
+
+fn sort<T: Ord>(t1: T, t2: T) -> (T, T) {
+    if t1 < t2 {
+        (t1, t2)
+    } else {
+        (t2, t1)
+    }
+}
+
+fn make_map(slice: &[Instruction]) -> Vec<Point> {
+    let (mut x, mut y) = (0isize, 0isize);
+    slice
+        .iter()
+        .map(|ins| {
+            let (old_x, old_y) = (x, y);
+            match ins {
+                Instruction::Down(n) => {
+                    y -= *n as isize;
+                    Point::Vertical {
+                        x: old_x,
+                        y: old_y,
+                        dy: y,
+                    }
+                }
+                Instruction::Up(n) => {
+                    y += *n as isize;
+                    Point::Vertical {
+                        x: old_x,
+                        y: old_y,
+                        dy: y,
+                    }
+                }
+                Instruction::Right(n) => {
+                    x += *n as isize;
+                    Point::Horizontal {
+                        y: y,
+                        x: old_x,
+                        dx: x,
+                    }
+                }
+                Instruction::Left(n) => {
+                    x -= *n as isize;
+                    Point::Horizontal {
+                        y: y,
+                        x: old_x,
+                        dx: x,
+                    }
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
+fn main() {
+    let (first, second) = parse(PUZZLE);
+
+    let first_map = make_map(&first);
+    let second_map = make_map(&second);
+
+    let p1 = second_map
+        .iter()
+        .flat_map(|elem| elem.intersect(&first_map))
+        .min();
+
+    println!("Part 1:  {:?}", p1);
+}
