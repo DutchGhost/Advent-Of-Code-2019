@@ -41,19 +41,19 @@ enum Point {
 impl Point {
     fn contains_x(&self, check_x: isize) -> bool {
         match self {
-            Self::Horizontal { x, dx, y } => {
+            Self::Horizontal { x, dx, .. } => {
                 let (x, dx) = sort(x, dx);
 
                 *x <= check_x && check_x <= *dx
             }
-            Self::Vertical { x, y, dy } => *x == check_x,
+            Self::Vertical { x, .. } => *x == check_x,
         }
     }
 
     fn contains_y(&self, check_y: isize) -> bool {
         match self {
-            Self::Horizontal { x, dx, y } => *y == check_y,
-            Self::Vertical { x, y, dy } => {
+            Self::Horizontal { y, .. } => *y == check_y,
+            Self::Vertical { y, dy, .. } => {
                 let (y, dy) = sort(y, dy);
 
                 *y <= check_y && check_y <= *dy
