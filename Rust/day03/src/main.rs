@@ -70,9 +70,9 @@ impl Segment {
 
     fn intersect<'a>(
         &'a self,
-        list: impl Iterator<Item = &'a Self> + 'a,
+        iter: impl Iterator<Item = &'a Self> + 'a,
     ) -> impl Iterator<Item = isize> + 'a {
-        list.filter(move |item| match item {
+        iter.filter(move |item| match item {
             Self::Horizontal { y, .. } => match self {
                 Self::Vertical { x, .. } => self.contains_y(*y) && item.contains_x(*x),
                 _ => false,
