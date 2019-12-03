@@ -1,5 +1,7 @@
 static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day03.txt");
 
+use std::collections::hash_map::{Entry, HashMap};
+
 #[derive(Debug)]
 enum Instruction {
     Right(usize),
@@ -66,28 +68,30 @@ impl Point {
         }
     }
 
-    fn intersect<'a>(&'a self, list: &'a [Self]) -> impl Iterator<Item = isize> + 'a {
-        list.iter()
-            .filter(move |item| match item {
-                Self::Horizontal { y, .. } => match self {
-                    Self::Vertical { x, .. } => self.contains_y(*y) && item.contains_x(*x),
-                    _ => false,
-                },
-                Self::Vertical { x, .. } => match self {
-                    Self::Horizontal { y, .. } => self.contains_x(*x) && item.contains_y(*y),
-                    _ => false,
-                },
-            })
-            .map(move |item| match item {
-                Self::Horizontal { y, .. } => match self {
-                    Self::Vertical { x, .. } => y.abs() + x.abs(),
-                    _ => unreachable!(),
-                },
-                Self::Vertical { x, .. } => match self {
-                    Self::Horizontal { y, .. } => y.abs() + x.abs(),
-                    _ => unreachable!(),
-                },
-            })
+    fn intersect<'a>(
+        &'a self,
+        list: impl Iterator<Item = &'a Self> + 'a,
+    ) -> impl Iterator<Item = isize> + 'a {
+        list.filter(move |item| match item {
+            Self::Horizontal { y, .. } => match self {
+                Self::Vertical { x, .. } => self.contains_y(*y) && item.contains_x(*x),
+                _ => false,
+            },
+            Self::Vertical { x, .. } => match self {
+                Self::Horizontal { y, .. } => self.contains_x(*x) && item.contains_y(*y),
+                _ => false,
+            },
+        })
+        .map(move |item| match item {
+            Self::Horizontal { y, .. } => match self {
+                Self::Vertical { x, .. } => y.abs() + x.abs(),
+                _ => unreachable!(),
+            },
+            Self::Vertical { x, .. } => match self {
+                Self::Horizontal { y, .. } => y.abs() + x.abs(),
+                _ => unreachable!(),
+            },
+        })
     }
 }
 
@@ -143,16 +147,138 @@ fn make_map<'a>(
     })
 }
 
-fn main() {
-    let (first, second) = parse(PUZZLE);
+fn part1(s: &str) -> isize {
+    let (first, second) = parse(s);
 
     let (mut x, mut y) = (0, 0);
     let first_map = make_map(&mut x, &mut y, first).collect::<Vec<_>>();
 
     let (mut x, mut y) = (0, 0);
-    let p1 = make_map(&mut x, &mut y, second)
-        .filter_map(move |elem| elem.intersect(&first_map).min())
-        .min();
+    make_map(&mut x, &mut y, second)
+        .filter_map(move |elem| elem.intersect(first_map.iter()).min())
+        .min()
+        .unwrap()
+}
 
-    println!("Part 1:  {:?}", p1);
+#[derive(Ord, PartialOrd, Hash, Clone, Copy, Eq, PartialEq)]
+enum Line {
+    First,
+    Second,
+}
+
+fn setup_first_wire(
+    map: &mut HashMap<(isize, isize), (usize, Line)>,
+    iter: impl Iterator<Item = Instruction>,
+) {
+    let (mut cx, mut cy) = (0, 0);
+
+    let mut first_total_steps = 0usize;
+
+    for elem in iter {
+        match elem {
+            Instruction::Down(n) => {
+                for _ in 0..n {
+                    cy -= 1;
+                    first_total_steps += 1;
+                    map.insert((cx, cy), (first_total_steps, Line::First));
+                }
+            }
+            Instruction::Up(n) => {
+                for _ in 0..n {
+                    cy += 1;
+                    first_total_steps += 1;
+                    map.insert((cx, cy), (first_total_steps, Line::First));
+                }
+            }
+            Instruction::Left(n) => {
+                for _ in 0..n {
+                    cx -= 1;
+                    first_total_steps += 1;
+                    map.insert((cx, cy), (first_total_steps, Line::First));
+                }
+            }
+            Instruction::Right(n) => {
+                for _ in 0..n {
+                    cx += 1;
+                    first_total_steps += 1;
+                    map.insert((cx, cy), (first_total_steps, Line::First));
+                }
+            }
+        }
+    }
+}
+
+fn inserter_fn(
+    map: &mut HashMap<(isize, isize), (usize, Line)>,
+    collided: &mut Vec<usize>,
+    cx: isize,
+    cy: isize,
+    steps: usize,
+) {
+    match map.entry((cx, cy)) {
+        Entry::Vacant(e) => {
+            e.insert((steps, Line::Second));
+        }
+        Entry::Occupied(o) => {
+            let (n, line) = o.get();
+
+            if *line == Line::First {
+                collided.push(n + steps);
+            }
+        }
+    }
+}
+
+fn part2(s: &str) -> usize {
+    let (first, second) = parse(s);
+
+    let mut map = HashMap::new();
+
+    setup_first_wire(&mut map, first);
+
+    let mut collided = Vec::new();
+    let mut second_total_steps = 0;
+
+    let (mut cx, mut cy) = (0, 0);
+
+    for elem in second {
+        match elem {
+            Instruction::Down(n) => {
+                for _ in 0..n {
+                    cy -= 1;
+                    second_total_steps += 1;
+                    inserter_fn(&mut map, &mut collided, cx, cy, second_total_steps);
+                }
+            }
+            Instruction::Up(n) => {
+                for _ in 0..n {
+                    cy += 1;
+                    second_total_steps += 1;
+                    inserter_fn(&mut map, &mut collided, cx, cy, second_total_steps);
+                }
+            }
+            Instruction::Left(n) => {
+                for _ in 0..n {
+                    cx -= 1;
+                    second_total_steps += 1;
+                    inserter_fn(&mut map, &mut collided, cx, cy, second_total_steps);
+                }
+            }
+            Instruction::Right(n) => {
+                for _ in 0..n {
+                    cx += 1;
+                    second_total_steps += 1;
+                    inserter_fn(&mut map, &mut collided, cx, cy, second_total_steps);
+                }
+            }
+        }
+    }
+
+    collided.into_iter().min().unwrap()
+}
+
+fn main() {
+    let p1 = part1(PUZZLE);
+    let p2 = part2(PUZZLE);
+    println!("Part 1: {}\nPart 2: {}", p1, p2);
 }
