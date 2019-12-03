@@ -8,7 +8,12 @@ enum Instruction {
     Up(usize),
 }
 
-fn parse<'a>(s: &'a str) -> (impl Iterator<Item = Instruction> + 'a, impl Iterator<Item = Instruction> + 'a ) {
+fn parse<'a>(
+    s: &'a str,
+) -> (
+    impl Iterator<Item = Instruction> + 'a,
+    impl Iterator<Item = Instruction> + 'a,
+) {
     let mut lines = s.lines();
 
     let first = lines.next().unwrap();
