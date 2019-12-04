@@ -1,53 +1,45 @@
-const BEGIN: usize = 146810;
-const END: usize = 612564;
+const BEGIN: [u8; 6] = [1, 4, 6, 8, 1, 0];
+const END: [u8; 6] = [6, 1, 2, 5, 6, 4];
 
 mod group;
 use group::Grouped;
 
-fn calc_num(nums: [usize; 6]) -> usize {
-    let mut multiplier = 1;
+macro_rules! hexafor {
+    ([$name:ident $(,$names:ident)*] in [$e:expr $(,$es:expr)*] $b:block) => {
+        for $name in $e..10 {
+            hexafor!([$($names),*] in [$($es),*] $b);
+        }
+    };
 
-    let mut result = 0;
-    for n in nums.iter().rev() {
-        result += n * multiplier;
-        multiplier *= 10;
-    }
-    result
+    ([$name:ident] in [$e:expr] $b:block) => {
+        for $name
+        in $e..10 $b
+    };
+    ([] in [] $b:block) => {$b}
 }
 
-fn loopy<F: Fn(usize, usize, usize, usize, usize, usize) -> bool>(func: F) -> usize {
-    let mut ok = 0;
-
-    for a in 0..10 {
-        for b in a..10 {
-            for c in b..10 {
-                for d in c..10 {
-                    for e in d..10 {
-                        for f in e..10 {
-                            let n = calc_num([a, b, c, d, e, f]);
-                            if n < BEGIN {
-                                continue;
-                            }
-                            if n > END {
-                                return ok;
-                            }
-                            if func(a, b, c, d, e, f) {
-                                ok += 1;
-                            }
-                        }
-                    }
-                }
+fn loopy<F: Fn(u8, u8, u8, u8, u8, u8) -> bool>(func: F) -> usize {
+    let mut valids = 0;
+    
+    hexafor! {
+        [a, b, c, d, e, f] in [0, a, b, c, d, e] {
+            if [a, b, c, d, e, f] < BEGIN {
+                continue;
+            }
+            if [a, b, c, d, e, f] > END {
+                return valids;
+            }
+            if func(a, b, c, d, e, f) {
+                valids += 1;
             }
         }
-    }
-
-    ok
+    };
+    valids
 }
 
 fn part1() -> usize {
     loopy(|a, b, c, d, e, f| a == b || b == c || c == d || d == e || e == f)
 }
-
 
 fn part2() -> usize {
     loopy(|a, b, c, d, e, f| Grouped::groups(&[a, b, c, d, e, f]).any(|group| group.len() == 2))
