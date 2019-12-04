@@ -6,23 +6,22 @@ use group::Grouped;
 
 macro_rules! hexafor {
     ([$name:ident $(,$names:ident)*] in [$e:expr $(,$es:expr)*] $b:block) => {
-        for $name in $e..10 {
+        for $name in $e {
             hexafor!([$($names),*] in [$($es),*] $b);
         }
     };
 
     ([$name:ident] in [$e:expr] $b:block) => {
-        for $name
-        in $e..10 $b
+        for $name in $e $b
     };
     ([] in [] $b:block) => {$b}
 }
 
 fn loopy<F: Fn(u8, u8, u8, u8, u8, u8) -> bool>(func: F) -> usize {
     let mut valids = 0;
-    
+
     hexafor! {
-        [a, b, c, d, e, f] in [0, a, b, c, d, e] {
+        [a, b, c, d, e, f] in [0..10, a..10, b..10, c..10, d..10, e..10] {
             if [a, b, c, d, e, f] < BEGIN {
                 continue;
             }
