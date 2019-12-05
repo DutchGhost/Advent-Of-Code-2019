@@ -65,7 +65,6 @@ impl Opcode {
             Self::LessThan => 3,
             Self::Equals => 3,
             Self::Halt => 1,
-            //_ => unreachable!()
         }
     }
 
@@ -74,8 +73,7 @@ impl Opcode {
 
         let _ip = *ip as usize;
         let modes = modes_of(program[_ip]);
-        dbg!(program[_ip]);
-        dbg!(self);
+
         match self {
             Opcode::Add => {
                 let lhs = program[_ip + 1];
@@ -106,10 +104,8 @@ impl Opcode {
 
                 if read_value(program, checkme, modes[0]) != 0 {
                     let jmp = program[_ip + 2];
-                    dbg!(modes[1]);
                     let jmp = read_value(program, jmp, modes[1]);
-                    dbg!(jmp);
-                    *ip += jmp;
+                    *ip = jmp;
                     return ExecuteResult::Continue;
                 }
             }
@@ -118,10 +114,8 @@ impl Opcode {
 
                 if read_value(program, checkme, modes[0]) == 0 {
                     let jmp = program[_ip + 2];
-                    dbg!(modes[1]);
                     let jmp = read_value(program, jmp, modes[1]);
-                    dbg!(jmp);
-                    *ip += jmp;
+                    *ip = jmp;
                     return ExecuteResult::Continue;
                 }
             }
@@ -193,13 +187,13 @@ fn part1(s: &str) -> isize {
 }
 
 fn part2(s: &str) -> isize {
-    let mut program = parse_input("3,21,1008,21,8,20,1005,20,22,107,8,21,20,1006,20,31,1106,0,36,98,0,0,1002,21,125,20,4,20,1105,1,46,104,999,1105,1,46,1101,1000,1,20,4,20,1105,1,46,98,99");
+    let mut program = parse_input(s);
     let mut ip = 0;
     let mut exit = 0;
 
     loop {
         let opcode = Opcode::from(program[ip as usize] % 100);
-        match opcode.execute(&mut ip, &mut program, 0) {
+        match opcode.execute(&mut ip, &mut program, 5) {
             ExecuteResult::Continue => {}
             ExecuteResult::Output(result) => exit = result,
             ExecuteResult::Exit => break,
@@ -210,7 +204,7 @@ fn part2(s: &str) -> isize {
 }
 
 fn main() {
-    let p1 = 0;//part1(PUZZLE);
+    let p1 = part1(PUZZLE);
     let p2 = part2(PUZZLE);
 
     println!("Part 1: {}\nPart 2: {}", p1, p2);
@@ -221,6 +215,13 @@ mod tests {
     use super::*;
     #[test]
     fn test_modes() {
-        assert_eq!(modes_of(1002), [ParameterMode::Position, ParameterMode::Immediate, ParameterMode::Position]);
+        assert_eq!(
+            modes_of(1002),
+            [
+                ParameterMode::Position,
+                ParameterMode::Immediate,
+                ParameterMode::Position
+            ]
+        );
     }
 }
