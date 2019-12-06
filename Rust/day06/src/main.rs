@@ -75,9 +75,8 @@ fn contains_orbitter<'a>(
             || {
                 orbitters
                     .iter()
-                    .filter_map(|orbittee| contains_orbitter(orbittee, orbitter, map))
+                    .find_map(|orbittee| contains_orbitter(orbittee, orbitter, map))
                     .map(|depth| depth + 1)
-                    .next()
             },
             |_| Some(1),
         )
@@ -85,15 +84,11 @@ fn contains_orbitter<'a>(
 }
 
 fn part2_alternative<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
-    let (count, depth) =
-        std::iter::successors(Some("SAN"), |orbitter| orbittee_of(orbitter, orbits))
-            .map(|orbitter| Some(contains_orbitter(orbitter, "YOU", orbits)))
-            .enumerate()
-            .find(|(_, depth)| depth.unwrap().is_some())
-            .map(|(count, depth)| (count, depth.unwrap().unwrap()))
-            .unwrap();
-
-    count + depth - 2
+    std::iter::successors(Some("SAN"), |orbitter| orbittee_of(orbitter, orbits))
+        .enumerate()
+        .find_map(|(count, orbitter)| Some((count, contains_orbitter(orbitter, "YOU", orbits)?)))
+        .map(|(count, depth)| count + depth - 2)
+        .unwrap()
 }
 
 fn main() {
