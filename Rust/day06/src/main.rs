@@ -14,20 +14,16 @@ fn parse(s: &str) -> (&str, &str) {
 fn recursive<'a>(orbittee: &'a str, map: &OrbitGraph<&'a str, HashSet<&'a str>>) -> usize {
     let mut count = 0;
 
-    match map.orbit_index(&orbittee) {
-        Some(orbits) => {
-            for orbitter in orbits.iter() {
-                count += 1;
-                let counted = recursive(orbitter, map);
-                count += counted;
-            }
-            count
-        }
-        None => 0,
-    }
+    map.orbit_index(&orbittee)
+        .map(|orbits| {
+            orbits
+                .iter()
+                .fold(0, |count, orbitter| count + 1 + recursive(orbitter, map))
+        })
+        .unwrap_or(0)
 }
 
-fn main() {
+fn part1(s: &str) -> usize {
     let mut orbits: OrbitGraph<&str, HashSet<&str>> = OrbitGraph::new();
 
     for line in PUZZLE.lines() {
@@ -36,10 +32,14 @@ fn main() {
         orbits.orbit(orbitter);
     }
 
-    let mut total = 0;
-    for (k, _) in orbits.iter() {
-        total += recursive(k, &orbits);
-    }
+    orbits
+        .iter()
+        .map(|(orbittee, _)| recursive(orbittee, &orbits))
+        .sum()
+}
 
-    dbg!(total);
+fn main() {
+    let p1 = part1(PUZZLE);
+
+    println!("Part 1: {}\n", p1);
 }
