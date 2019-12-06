@@ -1,6 +1,6 @@
 static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day06.txt");
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 fn parse(s: &str) -> (&str, &str) {
     let mut splitter = s.split(")");
@@ -8,13 +8,12 @@ fn parse(s: &str) -> (&str, &str) {
     (splitter.next().unwrap(), splitter.next().unwrap())
 }
 
-fn recursive<'a>(orbittee: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
-
+fn orbitters_of<'a>(orbittee: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
     map.get(&orbittee)
         .map(|orbits| {
             orbits
                 .iter()
-                .fold(0, |count, orbitter| count + 1 + recursive(orbitter, map))
+                .fold(0, |count, orbitter| count + 1 + orbitters_of(orbitter, map))
         })
         .unwrap_or(0)
 }
@@ -22,11 +21,11 @@ fn recursive<'a>(orbittee: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) ->
 fn part1<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
     orbits
         .iter()
-        .map(|(orbittee, _)| recursive(orbittee, &orbits))
+        .map(|(orbittee, _)| orbitters_of(orbittee, &orbits))
         .sum()
 }
 
-fn recfind<'a>(
+fn path_till_comm<'a>(
     stack: &mut Vec<&'a str>,
     orbittee: &'a str,
     map: &HashMap<&'a str, HashSet<&'a str>>,
@@ -36,18 +35,18 @@ fn recfind<'a>(
         .map(|(k, _)| {
             stack.push(k);
 
-            recfind(stack, k, map);
+            path_till_comm(stack, k, map);
         });
 }
 
 fn part2<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
     let mut san = Vec::new();
 
-    recfind(&mut san, "SAN", &orbits);
+    path_till_comm(&mut san, "SAN", &orbits);
 
     let mut you = Vec::new();
 
-    recfind(&mut you, "YOU", &orbits);
+    path_till_comm(&mut you, "YOU", &orbits);
 
     you.iter()
         .enumerate()
@@ -65,7 +64,10 @@ fn main() {
 
     for line in PUZZLE.lines() {
         let (orbittee, orbitter) = parse(line);
-        orbits.entry(orbittee).or_insert_with(HashSet::default).insert(orbitter);
+        orbits
+            .entry(orbittee)
+            .or_insert_with(HashSet::default)
+            .insert(orbitter);
         orbits.entry(orbitter).or_insert_with(HashSet::default);
     }
 
