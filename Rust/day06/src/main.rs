@@ -59,6 +59,43 @@ fn part2<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
         .unwrap()
 }
 
+fn orbittee_of<'a>(orbitter: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) -> Option<&'a str> {
+    map.iter()
+        .find(|(_, orbitters)| orbitters.contains(orbitter))
+        .map(|(orbittee, _)| *orbittee)
+}
+
+fn contains_orbitter<'a>(
+    orbittee: &'a str,
+    orbitter: &'a str,
+    map: &HashMap<&'a str, HashSet<&'a str>>,
+) -> Option<usize> {
+    map.get(orbittee).and_then(|orbitters| {
+        orbitters.get(orbitter).map_or_else(
+            || {
+                orbitters
+                    .iter()
+                    .filter_map(|orbittee| contains_orbitter(orbittee, orbitter, map))
+                    .map(|depth| depth + 1)
+                    .next()
+            },
+            |_| Some(1),
+        )
+    })
+}
+
+fn part2_alternative<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
+    let (count, depth) =
+        std::iter::successors(Some("SAN"), |orbitter| orbittee_of(orbitter, orbits))
+            .map(|orbitter| Some(contains_orbitter(orbitter, "YOU", orbits)))
+            .enumerate()
+            .find(|(_, depth)| depth.unwrap().is_some())
+            .map(|(count, depth)| (count, depth.unwrap().unwrap()))
+            .unwrap();
+
+    count + depth - 2
+}
+
 fn main() {
     let mut orbits: HashMap<&str, HashSet<&str>> = HashMap::new();
 
@@ -70,9 +107,12 @@ fn main() {
             .insert(orbitter);
         orbits.entry(orbitter).or_insert_with(HashSet::default);
     }
-
     let p1 = part1(&orbits);
     let p2 = part2(&orbits);
+    let p2_alternative = part2_alternative(&orbits);
 
-    println!("Part 1: {}\nPart 2: {}", p1, p2);
+    println!(
+        "Part 1: {}\nPart 2: {}\nPart 2 alternative: {}",
+        p1, p2, p2_alternative
+    );
 }
