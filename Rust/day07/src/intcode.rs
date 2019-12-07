@@ -1,7 +1,9 @@
+use crate::channel::{Rx, Tx};
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum Mode {
     Position,
-    Immediate
+    Immediate,
 }
 
 impl From<isize> for Mode {
@@ -43,13 +45,13 @@ impl From<isize> for Op {
 #[derive(Eq, PartialEq, Debug)]
 pub struct Opcode {
     opcode: Op,
-    modes: [Mode; 3]
+    modes: [Mode; 3],
 }
 
 impl Opcode {
     fn parse(code: isize) -> Self {
         let opcode = Op::from(code);
-        
+
         let modes = [
             Mode::from(code / 100 % 10),
             Mode::from(code / 1000 % 10),
@@ -67,6 +69,15 @@ pub enum Poll<'a, T> {
     Output(T),
 }
 
+pub enum Poll2 {
+    Running,
+    Exit,
+    WaitInput,
+    WaitOutput,
+    ReceivedInput,
+}
+
+#[derive(Debug)]
 pub struct Machine {
     ip: usize,
     memory: Vec<isize>,
@@ -91,8 +102,8 @@ pub trait Read: InstructionPointer {
                 let addr = self.read(self.ip() + index);
                 assert!(addr > -1);
                 self.read(addr as usize)
-            },
-            Mode::Immediate => self.read(self.ip() + index)
+            }
+            Mode::Immediate => self.read(self.ip() + index),
         }
     }
 }
@@ -107,8 +118,12 @@ pub trait Write: Read {
 }
 
 impl InstructionPointer for Machine {
-    fn ip(&self) -> usize { self.ip }
-    fn set_ip(&mut self, new_ip: usize) { self.ip = new_ip; }
+    fn ip(&self) -> usize {
+        self.ip
+    }
+    fn set_ip(&mut self, new_ip: usize) {
+        self.ip = new_ip;
+    }
 }
 
 impl Memory for Machine {
@@ -203,10 +218,10 @@ pub trait Intcode: Read + Write + Memory {
 
     fn save(&mut self) -> Poll<isize> {
         let addr = self.read(self.ip() + 1);
-        
+
         self.set_ip(self.ip() + 2);
         let out = Poll::Input(&mut self.memory()[addr as usize]);
-        
+
         out
     }
 
@@ -232,15 +247,61 @@ pub trait Intcode: Read + Write + Memory {
             Op::JumpIfFalse => self.jump_if_false(&modes),
             Op::LessThan => self.less_than(&modes),
             Op::Equals => self.equals(&modes),
-            Op::Halt => self.halt()
+            Op::Halt => self.halt(),
         }
     }
 }
 
-impl <I> Intcode for I where I: Read + Write + Memory {}
+impl<I> Intcode for I where I: Read + Write + Memory {}
 
 impl Machine {
     pub fn new(memory: Vec<isize>) -> Self {
         Self { ip: 0, memory }
+    }
+}
+
+#[derive(Debug)]
+pub struct ChanneledMachine<'a> {
+    machine: Machine,
+    recv: Rx<'a, isize>,
+    snd: Tx<'a, isize>,
+    pub(crate) last_output: Option<isize>,
+}
+
+impl<'a> ChanneledMachine<'a> {
+    pub fn new(memory: Vec<isize>, snd: Tx<'a, isize>, recv: Rx<'a, isize>) -> Self {
+        Self {
+            machine: Machine::new(memory),
+            snd,
+            recv,
+            last_output: None,
+        }
+    }
+
+    pub fn step<'s>(&'s mut self) -> Poll2 {
+        match self.machine.step() {
+            Poll::Running => Poll2::Running,
+            Poll::Exit => Poll2::Exit,
+            Poll::Input(i) => match self.recv.recv() {
+                None => {
+                    self.machine.set_ip(self.machine.ip() - 2);
+                    Poll2::WaitInput
+                }
+                Some(elem) => {
+                    *i = elem;
+                    Poll2::ReceivedInput
+                }
+            },
+            Poll::Output(i) => match self.snd.send(i) {
+                Ok(()) => {
+                    self.last_output = Some(i);
+                    Poll2::Running
+                }
+                Err(()) => {
+                    self.machine.set_ip(self.machine.ip() - 2);
+                    Poll2::WaitOutput
+                }
+            },
+        }
     }
 }
