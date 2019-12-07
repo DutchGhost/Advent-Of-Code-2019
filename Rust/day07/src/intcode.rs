@@ -78,6 +78,17 @@ pub enum Poll2 {
 }
 
 #[derive(Debug)]
+pub struct RunError {
+    s: &'static str,
+}
+
+impl RunError {
+    pub const fn new(s: &'static str) -> Self {
+        Self { s }
+    }
+}
+
+#[derive(Debug)]
 pub struct Machine {
     ip: usize,
     memory: Vec<isize>,
@@ -250,6 +261,27 @@ pub trait Intcode: Read + Write + Memory {
             Op::Halt => self.halt(),
         }
     }
+
+    fn run<I>(&mut self, into_iter: I) -> Result<isize, RunError>
+    where
+        I: IntoIterator<Item = isize>,
+    {
+        let mut exit = 0;
+        let mut iter = into_iter.into_iter();
+
+        loop {
+            match self.step() {
+                Poll::Running => {}
+                Poll::Output(result) => exit = result,
+                Poll::Input(input) => {
+                    *input = iter.next().ok_or(RunError::new("Failed to give input"))?
+                }
+                Poll::Exit => break,
+            }
+        }
+
+        Ok(exit)
+    }
 }
 
 impl<I> Intcode for I where I: Read + Write + Memory {}
@@ -265,7 +297,7 @@ pub struct ChanneledMachine<'a> {
     machine: Machine,
     recv: Rx<'a, isize>,
     snd: Tx<'a, isize>,
-    pub(crate) last_output: Option<isize>,
+    pub(crate) is_done: bool,
 }
 
 impl<'a> ChanneledMachine<'a> {
@@ -274,34 +306,51 @@ impl<'a> ChanneledMachine<'a> {
             machine: Machine::new(memory),
             snd,
             recv,
-            last_output: None,
+            is_done: false,
         }
     }
 
     pub fn step<'s>(&'s mut self) -> Poll2 {
+        if self.is_done {
+            return Poll2::Exit;
+        }
         match self.machine.step() {
             Poll::Running => Poll2::Running,
-            Poll::Exit => Poll2::Exit,
+            Poll::Exit => {
+                self.is_done = true;
+                Poll2::Exit
+            }
             Poll::Input(i) => match self.recv.recv() {
-                None => {
+                Err(_) => {
                     self.machine.set_ip(self.machine.ip() - 2);
                     Poll2::WaitInput
                 }
-                Some(elem) => {
+                Ok(elem) => {
                     *i = elem;
                     Poll2::ReceivedInput
                 }
             },
             Poll::Output(i) => match self.snd.send(i) {
-                Ok(()) => {
-                    self.last_output = Some(i);
-                    Poll2::Running
-                }
-                Err(()) => {
+                Ok(()) => Poll2::Running,
+                Err(_) => {
                     self.machine.set_ip(self.machine.ip() - 2);
                     Poll2::WaitOutput
                 }
             },
+        }
+    }
+
+    /// Returns true when the machine is done,
+    /// false otherwise.
+    pub fn make_progress(&mut self) -> bool {
+        loop {
+            match self.step() {
+                Poll2::Exit => return true,
+                Poll2::Running => continue,
+                Poll2::ReceivedInput => continue,
+                Poll2::WaitInput => return false,
+                Poll2::WaitOutput => return false,
+            }
         }
     }
 }

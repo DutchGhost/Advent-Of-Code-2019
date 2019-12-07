@@ -5,36 +5,23 @@ fn parse_input(s: &str) -> Vec<isize> {
 }
 
 mod intcode;
-use intcode::{ChanneledMachine, Intcode, Machine, Poll, Poll2};
+use intcode::{ChanneledMachine, Intcode, Machine};
 
 mod channel;
 use channel::Channel;
 
-fn run_program(program: Vec<isize>, setting: isize, input_signal: isize) -> isize {
-    let mut exit = 0;
-    let mut machine = Machine::new(program);
-
-    let inputs = [setting, input_signal];
-    let mut inputs_idx = 0;
-    loop {
-        match machine.step() {
-            Poll::Running => {}
-            Poll::Output(result) => exit = result,
-            Poll::Input(i) => {
-                *i = inputs[inputs_idx];
-                inputs_idx += 1;
-            }
-            Poll::Exit => break,
-        }
-    }
-    exit
-}
+use std::{cmp, iter};
 
 fn run_settings(program: Vec<isize>, settings: &[isize]) -> isize {
     let mut signal = 0;
 
     for setting in settings {
-        signal = run_program(program.clone(), *setting, signal);
+        signal = match Machine::new(program.clone())
+            .run(iter::once(*setting).chain(iter::once(signal)))
+        {
+            Ok(signal) => signal,
+            Err(e) => panic!(e),
+        }
     }
 
     signal
@@ -65,38 +52,11 @@ fn part1(s: &str) -> isize {
         [a, b, c, d, e] in [0..=4, 0..=4, 0..=4, 0..=4, 0..=4] {
             if filter!(a, b, c, d, e) { continue }
             let output = run_settings(program.clone(), &[a, b, c, d, e]);
-            if output > highest {
-
-                highest = output;
-            }
+            highest = cmp::max(highest, output);
         }
     }
 
     highest
-}
-
-fn run_till_first_input(machine: &mut ChanneledMachine) {
-    loop {
-        match machine.step() {
-            Poll2::Running => continue,
-            Poll2::Exit => unreachable!(),
-            Poll2::ReceivedInput => break,
-            Poll2::WaitOutput => unreachable!(),
-            Poll2::WaitInput => unreachable!(),
-        }
-    }
-}
-
-fn run_till_done(machine: &mut ChanneledMachine) -> bool {
-    loop {
-        match machine.step() {
-            Poll2::Exit => return true,
-            Poll2::Running => continue,
-            Poll2::ReceivedInput => continue,
-            Poll2::WaitInput => return false,
-            Poll2::WaitOutput => return false,
-        }
-    }
 }
 
 fn channeled_run(program: Vec<isize>, seq: [isize; 5]) -> isize {
@@ -120,40 +80,31 @@ fn channeled_run(program: Vec<isize>, seq: [isize; 5]) -> isize {
             let mut d = ChanneledMachine::new(program.clone(), cd_tx, cd_recv);
             let mut e = ChanneledMachine::new(program.clone(), ce_tx, ce_recv);
 
-            run_till_first_input(&mut a);
-            run_till_first_input(&mut b);
-            run_till_first_input(&mut c);
-            run_till_first_input(&mut d);
-            run_till_first_input(&mut e);
+            let mut v = vec![&mut a, &mut b, &mut c, &mut d, &mut e];
 
-            ce_tx.send(0);
+            let mut did_send_0 = false;
 
-            let mut done = Vec::new();
-            let mut v = vec![("a", a), ("b", b), ("c", c), ("d", d), ("e", e)];
             loop {
+                if !did_send_0 {
+                    if let Ok(_) = ce_tx.send(0) {
+                        did_send_0 = true;
+                    };
+                }
                 if v.is_empty() {
                     break;
                 }
 
                 match v.pop() {
-                    Some((letter, mut machine)) => {
-                        if !run_till_done(&mut machine) {
-                            v.insert(0, (letter, machine));
-                        } else {
-                            done.push((letter, machine))
+                    Some(machine) => {
+                        if !machine.make_progress() {
+                            v.insert(0, machine);
                         }
                     }
                     None => panic!(),
                 }
             }
 
-            let result = done
-                .into_iter()
-                .find(|(l, _)| *l == "e")
-                .map(|(_, m)| m.last_output)
-                .unwrap()
-                .unwrap();
-            result
+            ca_recv.recv().unwrap()
         }
     }
 }
@@ -166,12 +117,8 @@ fn part2(s: &str) -> isize {
     multi_for! {
         [a, b, c, d, e] in [5..=9, 5..=9, 5..=9, 5..=9, 5..=9] {
             if filter!(a, b, c, d, e) { continue }
-
-            let result = channeled_run(program.clone(), [a, b, c, d, e]);
-
-            if result > highest {
-                highest = result;
-            }
+            let output = channeled_run(program.clone(), [a, b, c, d, e]);
+            highest = cmp::max(highest, output);
         }
     }
 
@@ -204,12 +151,13 @@ mod tests {
     fn assert_channeled_run() {
         let out = channeled_run(
             vec![
-                3, 26, 1001, 26, -4, 26, 3, 27, 1002, 27, 2, 27, 1, 27, 26, 27, 4, 27, 1001, 28,
-                -1, 28, 1005, 28, 6, 99, 0, 0, 5,
+                3, 52, 1001, 52, -5, 52, 3, 53, 1, 52, 56, 54, 1007, 54, 5, 55, 1005, 55, 26, 1001,
+                54, -5, 54, 1105, 1, 12, 1, 53, 54, 53, 1008, 54, 0, 55, 1001, 55, 1, 55, 2, 53,
+                55, 53, 4, 53, 1001, 56, -1, 56, 1005, 56, 6, 99, 0, 0, 0, 0, 10,
             ],
-            [9, 8, 7, 6, 5],
+            [9, 7, 8, 5, 6],
         );
 
-        assert_eq!(out, 139629729);
+        assert_eq!(out, 18216);
     }
 }
