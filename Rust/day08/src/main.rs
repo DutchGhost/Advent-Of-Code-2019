@@ -6,7 +6,7 @@ struct Layer {
 }
 
 fn freqs(iter: impl Iterator<Item = u8>) -> Layer {
-    let mut freqs = [0usize; 10];
+    let mut freqs = [0usize; 3];
 
     for elem in iter {
         freqs[elem as usize] += 1;
