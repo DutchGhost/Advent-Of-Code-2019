@@ -7,9 +7,9 @@ const BEGIN: [6]u8 = [_]u8{ 1, 4, 6, 8, 1, 0 };
 const END: [6]u8 = [_]u8{ 6, 1, 2, 5, 6, 4 };
 
 pub fn loopy(fun: fn (u8, u8, u8, u8, u8, u8) bool) !usize {
-    var valids = usize(0);
+    var valids: usize = 0;
 
-    var a = u8(0);
+    var a: u8 = 0;
     while (a < 10) : (a += 1) {
         var b = a;
 
