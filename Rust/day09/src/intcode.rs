@@ -260,11 +260,9 @@ pub trait Intcode: Read + Write + Memory {
     }
 
     fn save(&mut self, modes: &[Mode]) -> Poll<isize> {
-        //let addr = self.read_arg(self.ip() + 1, modes[0]);
         let offset = match modes[0] {
-            // Mode::Relative => dbg!(self.read((self.ip() as isize + dbg!(self.base())) as usize)),
-            Mode::Relative => self.base() + self.read(self.ip()),
-            Mode::Position => self.read(self.ip()),
+            Mode::Relative => self.base() + self.read(self.ip() + 1),
+            Mode::Position => self.read(self.ip() + 1),
             _ => panic!("Cant write in immediate mode!"),
         };
         self.set_ip(self.ip() + 2);
@@ -276,7 +274,6 @@ pub trait Intcode: Read + Write + Memory {
     fn output(&mut self, modes: &[Mode]) -> Poll<isize> {
         let out = Poll::Output(self.read_arg(1, modes[0]));
         self.set_ip(self.ip() + 2);
-        dbg!(&out);
         out
     }
 
