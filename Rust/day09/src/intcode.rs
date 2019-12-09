@@ -71,14 +71,6 @@ pub enum Poll<'a, T> {
     Output(T),
 }
 
-pub enum Poll2 {
-    Running,
-    Exit,
-    WaitInput,
-    WaitOutput,
-    ReceivedInput,
-}
-
 #[derive(Debug)]
 pub struct RunError {
     s: &'static str,
@@ -125,8 +117,7 @@ pub trait Read: InstructionPointer + RelativeBase {
                 let addr = self.base() + self.read(self.ip() + index);
                 assert!(addr > -1);
                 self.read(addr as usize)
-                
-            },
+            }
             Mode::Immediate => self.read(self.ip() + index),
         }
     }
@@ -140,11 +131,11 @@ pub trait Write: Read {
             Mode::Position => {
                 let addr = self.read(self.ip() + index);
                 self.write(addr as usize, value)
-            },
+            }
             Mode::Relative => {
                 let addr = self.base() + self.read(self.ip() + index);
                 self.write(addr as usize, value);
-            },
+            }
             _ => panic!("CANT WRITE IN MODE::IMMEDIATE"),
         }
     }
@@ -330,6 +321,10 @@ impl<I> Intcode for I where I: Read + Write + Memory {}
 
 impl Machine {
     pub fn new(memory: Vec<isize>) -> Self {
-        Self { ip: 0, memory, base: 0 }
+        Self {
+            ip: 0,
+            memory,
+            base: 0,
+        }
     }
 }
