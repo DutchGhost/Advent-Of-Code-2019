@@ -20,5 +20,10 @@ fn main() {
     while !machine.step() {}
 
     //dbg!(machine.visited);
-    dbg!(machine.visited.into_iter().map(|(k, v)| v.visits).filter(|v| *v >= 1).count());
+    dbg!(machine
+        .visited
+        .into_iter()
+        .map(|(k, v)| v.visits)
+        .filter(|v| *v >= 1)
+        .count());
 }

@@ -1,11 +1,7 @@
-use super::Machine;
 use super::intcode::{Intcode, Poll};
+use super::Machine;
 
-use std::{
-    collections::{
-        HashMap,
-    },
-};
+use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug)]
 enum Color {
@@ -73,7 +69,7 @@ enum Output {
 #[derive(Debug)]
 pub struct Cell {
     color: Color,
-    pub visits: usize
+    pub visits: usize,
 }
 
 pub struct Robot {
@@ -82,7 +78,7 @@ pub struct Robot {
     expecting: Output,
     x: isize,
     y: isize,
-    pub visited: HashMap<(isize, isize), Cell>
+    pub visited: HashMap<(isize, isize), Cell>,
 }
 
 impl Robot {
@@ -93,27 +89,34 @@ impl Robot {
             expecting: Output::Paint,
             x: 0,
             y: 0,
-            visited: HashMap::new()
+            visited: HashMap::new(),
         }
     }
 
     pub fn step(&mut self) -> bool {
-        let current_color = self.visited.get(&(self.x, self.y)).map(|cell| cell.color).unwrap_or(Color::Black);
+        let current_color = self
+            .visited
+            .get(&(self.x, self.y))
+            .map(|cell| cell.color)
+            .unwrap_or(Color::Black);
 
         let s = self.brain.step();
         //dbg!(&s);
         match s {
-            Poll::Running => {},
+            Poll::Running => {}
             Poll::Output(o) => {
                 match self.expecting {
                     Output::Paint => {
                         let color = Color::from_int(o);
-                        let mut entry = self.visited.entry((self.x, self.y)).or_insert(Cell { color: Color::Black, visits: 0});
+                        let mut entry = self.visited.entry((self.x, self.y)).or_insert(Cell {
+                            color: Color::Black,
+                            visits: 0,
+                        });
 
                         entry.color = color;
                         entry.visits += 1;
                         self.expecting = Output::Turn;
-                    },
+                    }
                     Output::Turn => {
                         let direction = Direction::from_int(o);
 
@@ -133,13 +136,11 @@ impl Robot {
                         self.expecting = Output::Paint
                     }
                 }
-            },
-            Poll::Input(i) => {
-                *i = current_color.to_int()
             }
+            Poll::Input(i) => *i = current_color.to_int(),
             Poll::Exit => return true,
         }
 
-        return false
+        return false;
     }
 }
