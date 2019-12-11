@@ -4,7 +4,7 @@ use super::Machine;
 use std::collections::HashMap;
 
 #[derive(Copy, Clone, Debug)]
-enum Color {
+pub enum Color {
     Black,
     White,
 }
@@ -68,8 +68,14 @@ enum Output {
 
 #[derive(Debug)]
 pub struct Cell {
-    color: Color,
+    pub color: Color,
     pub visits: usize,
+}
+
+impl Cell {
+    pub fn new(color: Color) -> Self {
+        Self { color, visits: 0 }
+    }
 }
 
 pub struct Robot {
@@ -82,14 +88,14 @@ pub struct Robot {
 }
 
 impl Robot {
-    pub fn new(program: Vec<isize>) -> Self {
+    pub fn new(program: Vec<isize>, visited: HashMap<(isize, isize), Cell>) -> Self {
         Self {
             brain: Machine::new(program),
             facing: Direction::Up,
             expecting: Output::Paint,
             x: 0,
             y: 0,
-            visited: HashMap::new(),
+            visited,
         }
     }
 
