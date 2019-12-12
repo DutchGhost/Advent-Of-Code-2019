@@ -4,24 +4,32 @@ fn parse_input(s: &str) -> Vec<isize> {
     s.split(",").map(|w| w.parse().unwrap()).collect::<Vec<_>>()
 }
 
-mod intcode;
-use intcode::{ChanneledMachine, Intcode, Machine};
+use intcode::{
+    channel::Channel,
+    future::{
+        sink::Stdout,
+        stream::{once, Stream, StreamExt},
+        FutureExt, Poll,
+    },
+    machine::Machine,
+};
 
-mod channel;
-use channel::Channel;
-
-use std::{cmp, iter};
+use std::cmp;
 
 fn run_settings(program: Vec<isize>, settings: &[isize]) -> isize {
     let mut signal = 0;
 
     for setting in settings {
-        signal = match Machine::new(program.clone())
-            .run(iter::once(*setting).chain(iter::once(signal)))
-        {
-            Ok(signal) => signal,
-            Err(e) => panic!(e),
-        }
+        let mut stdout = Stdout::new();
+
+        let mut machine = Machine::new(
+            program.clone(),
+            once(*setting).chain(once(signal)),
+            &mut stdout,
+        );
+        let _ = machine.execute();
+
+        signal = stdout.into_inner().unwrap();
     }
 
     signal
@@ -62,49 +70,35 @@ fn part1(s: &str) -> isize {
 fn channeled_run(program: Vec<isize>, seq: [isize; 5]) -> isize {
     match seq {
         [a, b, c, d, e] => {
-            let c_a = Channel::new(a);
-            let c_b = Channel::new(b);
-            let c_c = Channel::new(c);
-            let c_d = Channel::new(d);
-            let c_e = Channel::new(e);
+            let c_a = Channel::empty();
+            let c_b = Channel::empty();
+            let c_c = Channel::empty();
+            let c_d = Channel::empty();
+            let c_e = Channel::empty();
 
-            let (ca_tx, cb_recv) = c_a.split();
-            let (cb_tx, cc_recv) = c_b.split();
-            let (cc_tx, cd_recv) = c_c.split();
-            let (cd_tx, ce_recv) = c_d.split();
-            let (ce_tx, ca_recv) = c_e.split();
+            let (a_transmit, b_recv) = c_a.split();
+            let (b_transmit, c_recv) = c_b.split();
+            let (c_transmit, d_recv) = c_c.split();
+            let (d_transmit, e_recv) = c_d.split();
+            let (e_transmit, mut a_recv) = c_e.split();
 
-            let mut a = ChanneledMachine::new(program.clone(), ca_tx, ca_recv);
-            let mut b = ChanneledMachine::new(program.clone(), cb_tx, cb_recv);
-            let mut c = ChanneledMachine::new(program.clone(), cc_tx, cc_recv);
-            let mut d = ChanneledMachine::new(program.clone(), cd_tx, cd_recv);
-            let mut e = ChanneledMachine::new(program.clone(), ce_tx, ce_recv);
+            let a = Machine::new(
+                program.clone(),
+                once(a).chain(once(0)).chain(a_recv),
+                a_transmit,
+            );
+            let b = Machine::new(program.clone(), once(b).chain(b_recv), b_transmit);
+            let c = Machine::new(program.clone(), once(c).chain(c_recv), c_transmit);
+            let d = Machine::new(program.clone(), once(d).chain(d_recv), d_transmit);
+            let e = Machine::new(program.clone(), once(e).chain(e_recv), e_transmit);
 
-            let mut v = vec![&mut a, &mut b, &mut c, &mut d, &mut e];
+            let mut joined = a.join5(b, c, d, e);
 
-            let mut did_send_0 = false;
-
-            loop {
-                if !did_send_0 {
-                    if let Ok(_) = ce_tx.send(0) {
-                        did_send_0 = true;
-                    };
-                }
-                if v.is_empty() {
-                    break;
-                }
-
-                match v.pop() {
-                    Some(machine) => {
-                        if !machine.make_progress() {
-                            v.insert(0, machine);
-                        }
-                    }
-                    None => panic!(),
-                }
+            let _ = joined.execute();
+            match a_recv.poll_next() {
+                Poll::Ready(Some(elem)) => return elem,
+                _ => panic!(),
             }
-
-            ca_recv.recv().unwrap()
         }
     }
 }
