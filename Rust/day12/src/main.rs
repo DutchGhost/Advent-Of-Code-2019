@@ -44,18 +44,18 @@ fn parse(s: &str) -> Vec<Moon> {
 }
 
 macro_rules! update_velocity {
-    ($fst:expr, $scnd:expr, $moons:expr, [$axe:ident $(,$axis:ident)*]) => {
-        if $moons[$fst].location.$axe > $moons[$scnd].location.$axe {
-            $moons[$fst].velocity.$axe -= 1;
-            $moons[$scnd].velocity.$axe += 1;
+    ($fst:expr, $scnd:expr, $moons:expr, [$axis:ident $(,$axes:ident)*]) => {
+        if $moons[$fst].location.$axis > $moons[$scnd].location.$axis {
+            $moons[$fst].velocity.$axis -= 1;
+            $moons[$scnd].velocity.$axis += 1;
         }
 
-        if $moons[$fst].location.$axe < $moons[$scnd].location.$axe {
-            $moons[$fst].velocity.$axe += 1;
-            $moons[$fst].velocity.$axe -= 1;
+        if $moons[$fst].location.$axis < $moons[$scnd].location.$axis {
+            $moons[$fst].velocity.$axis += 1;
+            $moons[$fst].velocity.$axis -= 1;
         }
 
-        update_velocity!($fst, $scnd, $moons, [$($axis),*])
+        update_velocity!($fst, $scnd, $moons, [$($axes),*])
     };
     ($fst:expr, $scnd:expr, $moons:expr, []) => {()}
 }
