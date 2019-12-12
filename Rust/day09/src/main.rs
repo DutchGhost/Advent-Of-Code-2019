@@ -1,18 +1,32 @@
 static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day09.txt");
 
-mod intcode;
-use intcode::{Intcode, Machine};
+use intcode::{
+    machine::Machine,
+    future::{
+        FutureExt,
+        stream::{once},
+        sink::{Stdout},
+    }
+};
 
 fn parse_input(s: &str) -> Vec<isize> {
     s.split(",").map(|w| w.parse().unwrap()).collect::<Vec<_>>()
 }
 
 fn part1(v: Vec<isize>) -> isize {
-    Machine::new(v).run(std::iter::once(1)).unwrap()
+    let mut stdout = Stdout::new();
+    let mut machine = Machine::new(v, once(1), &mut stdout);
+    let _ = machine.execute();
+
+    stdout.into_inner().unwrap()
 }
 
 fn part2(v: Vec<isize>) -> isize {
-    Machine::new(v).run(std::iter::once(2)).unwrap()
+    let mut stdout = Stdout::new();
+    let mut machine = Machine::new(v, once(2), &mut stdout);
+    let _ = machine.execute();
+
+    stdout.into_inner().unwrap()
 }
 
 fn main() {
