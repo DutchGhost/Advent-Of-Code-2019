@@ -6,6 +6,17 @@ pub trait Stream {
     fn poll_next(&mut self) -> Poll<Option<Self::Item>>;
 }
 
+impl <S: ?Sized> Stream for &mut S
+where
+    S: Stream
+{
+    type Item = S::Item;
+
+    fn poll_next(&mut self) -> Poll<Option<Self::Item>> {
+        (**self).poll_next()
+    }
+}
+
 impl<S: ?Sized> StreamExt for S where S: Stream {}
 
 pub trait StreamExt: Stream {
