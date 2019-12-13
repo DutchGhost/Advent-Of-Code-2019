@@ -34,6 +34,22 @@ impl<T> Stream for Once<T> {
     }
 }
 
+pub struct Empty<T> {
+    inner: std::marker::PhantomData<T>,
+}
+
+pub fn empty<T>() -> Empty<T> {
+    Empty { inner: std::marker::PhantomData }
+}
+
+impl <T> Stream for Empty<T> {
+    type Item = T;
+    
+    fn poll_next(&mut self) -> Poll<Option<Self::Item>> {
+        Poll::Ready(None)
+    }
+}
+
 pub struct Chain<S1, S2> {
     first: Option<S1>,
     second: S2,
