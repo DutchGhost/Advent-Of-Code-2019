@@ -4,7 +4,9 @@ use std::{
 };
 
 use crate::{
-    future::{sink::Sink, stream::Stream, Future, Poll},
+    //future::{sink::Sink, stream::Stream, Future, Poll},
+    device::{Poll, Device},
+    io::{Read, Write},
     opcode::{Mnemonic, Mode, Opcode, OpcodeError},
 };
 
@@ -38,23 +40,21 @@ impl From<OpcodeError<isize, isize>> for MachineError {
     }
 }
 
-pub struct Machine<T, R: Stream<Item = T>, W: Sink<T>> {
+pub struct Machine<T, IO: Read<Item = T> + Write<T>> {
     ip: usize,
     base: isize,
     memory: Vec<T>,
-    reader: R,
-    writer: W,
+    io: IO,
 }
 
-impl<T, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W> {
+impl<T, IO: Read<Item = T> + Write<T>> Machine<T, IO> {
     #[inline(always)]
-    pub fn new(memory: Vec<T>, reader: R, writer: W) -> Self {
+    pub fn new(memory: Vec<T>, io: IO) -> Self {
         Self {
             ip: 0,
             base: 0,
             memory,
-            reader,
-            writer,
+            io,
         }
     }
 }
@@ -68,7 +68,7 @@ macro_rules! oob {
     };
 }
 
-impl<T, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W> {
+impl<T, IO: Read<Item = T> + Write<T>> Machine<T, IO> {
     #[inline(always)]
     fn ip(&self) -> usize {
         self.ip
@@ -88,7 +88,7 @@ impl<T, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W> {
     }
 }
 
-impl<T: Clone, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W> {
+impl<T: Clone, IO: Read<Item = T> + Write<T>> Machine<T, IO> {
     #[inline]
     fn read(&self, index: usize) -> Result<T, MachineError> {
         self.memory
@@ -98,7 +98,7 @@ impl<T: Clone, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W> {
     }
 }
 
-impl<T: Clone + TryInto<isize> + TryInto<usize>, R: Stream<Item = T>, W: Sink<T>> Machine<T, R, W>
+impl<T: Clone + TryInto<isize> + TryInto<usize>, IO: Read<Item = T> + Write<T>> Machine<T, IO>
 where
     MachineError: From<<T as TryInto<isize>>::Error> + From<<T as TryInto<usize>>::Error>,
 {
@@ -149,9 +149,11 @@ pub trait Intcode {
     fn equals(&mut self, modes: &[Mode]) -> Poll<Self::Output>;
 
     fn adjust_base(&mut self, modes: &[Mode]) -> Poll<Self::Output>;
+
+    fn halt(&mut self, modes: &[Mode]) -> Poll<Self::Output>;
 }
 
-impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
+impl<IO: Read<Item = isize> + Write<isize>> Intcode for Machine<isize, IO> {
     type Output = Result<(), MachineError>;
 
     fn opcode(&self) -> Result<Opcode, MachineError> {
@@ -164,7 +166,7 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
         try_unwrap!(self.write_operand(3, i1 + i2, modes[2]));
 
         self.ip += 4;
-        Poll::Running
+        Poll::Pending
     }
 
     fn mul(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -174,11 +176,11 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
         try_unwrap!(self.write_operand(3, i1 * i2, modes[2]));
 
         self.ip += 4;
-        Poll::Running
+        Poll::Pending
     }
 
     fn save(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
-        let value = match ready!(self.reader.poll_next()) {
+        let value = match ready!(self.io.poll_read()) {
             Some(value) => value,
             None => return Poll::Ready(Err(MachineError::ReaderExhausted)),
         };
@@ -192,24 +194,20 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
         let _ = try_unwrap!(self.write(try_unwrap!(usize::try_from(addr)), value));
         self.ip += 2;
 
-        Poll::Running
+        Poll::Pending
     }
 
     fn output(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
-        match ready!(self.writer.poll_ready()) {
+
+        let value = try_unwrap!(self.read_operand(1, modes[0]));
+        match ready!(self.io.poll_write(value)) {
             Ok(_) => {}
             Err(_) => return Poll::Ready(Err(MachineError::SinkPrepareError)),
-        };
-        let value = try_unwrap!(self.read_operand(1, modes[0]));
-
-        match self.writer.send(value) {
-            Ok(_) => {}
-            Err(_) => return Poll::Ready(Err(MachineError::SinkSendError)),
         };
 
         self.ip += 2;
 
-        Poll::Running
+        Poll::Pending
     }
 
     fn jump_if_true(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -222,7 +220,7 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
             self.ip += 3;
         }
 
-        Poll::Running
+        Poll::Pending
     }
 
     fn jump_if_false(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -235,7 +233,7 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
             self.ip += 3;
         }
 
-        Poll::Running
+        Poll::Pending
     }
 
     fn less_than(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -247,7 +245,7 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
 
         self.ip += 4;
 
-        Poll::Running
+        Poll::Pending
     }
 
     fn equals(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -258,7 +256,7 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
         try_unwrap!(self.write_operand(3, value, modes[2]));
 
         self.ip += 4;
-        Poll::Running
+        Poll::Pending
     }
 
     fn adjust_base(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
@@ -266,31 +264,35 @@ impl<R: Stream<Item = isize>, W: Sink<isize>> Intcode for Machine<isize, R, W> {
         self.base += new_base;
         self.ip += 2;
 
-        Poll::Running
+        Poll::Pending
+    }
+
+    fn halt(&mut self, modes: &[Mode]) -> Poll<Self::Output> {
+        Poll::Ready(Ok(()))
     }
 }
 
-impl<T, R: Stream<Item = T>, W: Sink<T>> Future for Machine<T, R, W>
+impl<T, IO: Read<Item = T> + Write<T>> Device for Machine<T, IO>
 where
-    Self: Intcode<Output = Result<(), MachineError>>,
+    Self: Intcode
 {
     type Output = <Self as Intcode>::Output;
 
     #[inline]
     fn poll(&mut self) -> Poll<Self::Output> {
         let Opcode { mnemonic, modes } = try_unwrap!(self.opcode());
-        let modes: &[_] = &modes;
+
         match mnemonic {
-            Mnemonic::Add => self.add(modes),
-            Mnemonic::Mul => self.mul(modes),
-            Mnemonic::Save => self.save(modes),
-            Mnemonic::Output => self.output(modes),
-            Mnemonic::JumpIfTrue => self.jump_if_true(modes),
-            Mnemonic::JumpIfFalse => self.jump_if_false(modes),
-            Mnemonic::LessThan => self.less_than(modes),
-            Mnemonic::Equals => self.equals(modes),
-            Mnemonic::AdjustBase => self.adjust_base(modes),
-            Mnemonic::Halt => return Poll::Ready(Ok(())),
+            Mnemonic::Add => self.add(&modes),
+            Mnemonic::Mul => self.mul(&modes),
+            Mnemonic::Save => self.save(&modes),
+            Mnemonic::Output => self.output(&modes),
+            Mnemonic::JumpIfTrue => self.jump_if_true(&modes),
+            Mnemonic::JumpIfFalse => self.jump_if_false(&modes),
+            Mnemonic::LessThan => self.less_than(&modes),
+            Mnemonic::Equals => self.equals(&modes),
+            Mnemonic::AdjustBase => self.adjust_base(&modes),
+            Mnemonic::Halt => self.halt(&modes),
         }
     }
 }
@@ -303,35 +305,30 @@ mod tests {
 
     struct Dummy(isize);
 
-    impl Stream for Dummy {
+    impl Read for Dummy {
         type Item = isize;
-        fn poll_next(&mut self) -> Poll<Option<Self::Item>> {
+        fn poll_read(&mut self) -> Poll<Option<Self::Item>> {
             Poll::Ready(Some(1))
         }
     }
 
-    impl Sink<isize> for Dummy {
+    impl Write<isize> for Dummy {
         type Error = ();
 
-        fn poll_ready(&mut self) -> Poll<Result<(), Self::Error>> {
-            Poll::Ready(Ok(()))
-        }
-
-        fn send(&mut self, value: isize) -> Result<(), Self::Error> {
+        fn poll_write(&mut self, value: isize) -> Poll<Result<(), Self::Error>> {
             self.0 = value;
-            Ok(())
+            Poll::Ready(Ok(()))
         }
     }
     #[test]
     fn test_read_ext() {
         let mut outputter = Dummy(0);
-        let mut m = Machine::<isize, Dummy, &mut Dummy>::new(
+        let mut m = Machine::<isize, &mut Dummy>::new(
             vec![
                 3, 21, 1008, 21, 8, 20, 1005, 20, 22, 107, 8, 21, 20, 1006, 20, 31, 1106, 0, 36,
                 98, 0, 0, 1002, 21, 125, 20, 4, 20, 1105, 1, 46, 104, 999, 1105, 1, 46, 1101, 1000,
                 1, 20, 4, 20, 1105, 1, 46, 98, 99,
             ],
-            Dummy(0),
             &mut outputter,
         );
 
@@ -344,16 +341,15 @@ mod tests {
     #[test]
     fn test_relative_offset() {
         let mut outputter = Dummy(0);
-        let mut m = Machine::<isize, Dummy, &mut Dummy>::new(
+        let mut m = Machine::<isize, &mut Dummy>::new(
             vec![1102, 34915192, 34915192, 7, 4, 7, 99, 0],
-            Dummy(0),
             &mut outputter,
         );
 
         let r = loop {
             match m.poll() {
                 Poll::Ready(r) => break r,
-                Poll::Running => continue,
+                Poll::Pending => continue,
             }
         };
 
