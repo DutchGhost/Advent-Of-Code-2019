@@ -1,3 +1,5 @@
+use std::mem;
+
 pub struct Grouped<'a, T: 'a> {
     slice: &'a [T],
 }
@@ -16,7 +18,7 @@ impl<'a, T: Ord + 'a> Iterator for Grouped<'a, T> {
             return None;
         }
 
-        let mvd = std::mem::replace(&mut self.slice, &mut <&[T]>::default());
+        let mvd = mem::take(&mut self.slice);
 
         let (fst, res) = mvd.split_first()?;
 
