@@ -25,10 +25,15 @@ where
         .unwrap_or(0)
 }
 
-fn part1<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
+fn part1<I, T, U>(orbits: &I) -> usize
+where
+    I: Get<T>,
+    for<'iter> &'iter I: IntoIterator<Item = (&'iter T, &'iter U)>,
+    for<'out> &'out <I as Get<T>>::Output: IntoIterator<Item = &'out T>,
+{
     orbits
-        .iter()
-        .map(|(orbittee, _): (&&str, _)| orbitters_of(orbittee, &orbits))
+        .into_iter()
+        .map(|(orbittee, _): (&T, &U)| orbitters_of(orbittee, orbits))
         .sum()
 }
 
