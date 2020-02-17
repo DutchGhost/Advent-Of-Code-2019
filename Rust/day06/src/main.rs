@@ -2,26 +2,44 @@ static PUZZLE: &'static str = include_str!(r"..\..\..\Inputs\day06.txt");
 
 use std::collections::{HashMap, HashSet};
 
+mod get;
+use get::Get;
+
 fn parse(s: &str) -> (&str, &str) {
     let mut splitter = s.split(")");
 
     (splitter.next().unwrap(), splitter.next().unwrap())
 }
 
-fn orbitters_of<'a>(orbittee: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
-    map.get(&orbittee)
+fn orbitters_of<'a, K: 'a, S>(orbittee: K, map: &S) -> usize
+where
+    S: Get<K>,
+    S::Output: IntoIterator<Item = &'a K>,
+    K: Copy,
+{
+    Get::get(map, &orbittee)
         .map(|orbits| {
-            orbits
-                .iter()
-                .fold(0, |count, orbitter| count + 1 + orbitters_of(orbitter, map))
+            orbits.into_iter().fold(0, |count, orbitter| {
+                count + 1 + orbitters_of(*orbitter, map)
+            })
         })
         .unwrap_or(0)
 }
 
+// fn orbitters_of<'a>(orbittee: &'a str, map: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
+//     map.get(&orbittee)
+//         .map(|orbits| {
+//             orbits
+//                 .iter()
+//                 .fold(0, |count, orbitter| count + 1 + orbitters_of(orbitter, map))
+//         })
+//         .unwrap_or(0)
+// }
+
 fn part1<'a>(orbits: &HashMap<&'a str, HashSet<&'a str>>) -> usize {
     orbits
         .iter()
-        .map(|(orbittee, _)| orbitters_of(orbittee, &orbits))
+        .map(|(orbittee, _): (&&str, _)| orbitters_of::<&str, _>(orbittee, &orbits))
         .sum()
 }
 
