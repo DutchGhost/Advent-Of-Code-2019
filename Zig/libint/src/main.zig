@@ -138,7 +138,7 @@ pub fn Machine(comptime IO: type) type {
         fn read_operand(self: *const Self, index: usize, mode: Mode) !isize {
             var offset = self.esp + index;
             var addr = switch (mode) {
-                Mode.Immediate => @intCast(isize, index),
+                Mode.Immediate => @intCast(isize, offset),
                 Mode.Position => (try self.read(offset)),
                 Mode.Relative => (try self.read(offset)) + self.ebp,
             };
@@ -239,7 +239,7 @@ pub fn Machine(comptime IO: type) type {
 
             var value = @as(isize, @boolToInt(r1 == r2));
 
-            try self.write_operand(3, value, modes[3]);
+            try self.write_operand(3, value, modes[2]);
             self.esp += 4;
 
             return Polled.Pending;
@@ -306,6 +306,24 @@ pub fn Write(comptime __ERROR__: type) type {
     return struct {
         const Error = __ERROR__;
         pub const PollWrite = Poll(Error!void);
+    };
+}
+
+pub fn Noopio(comptime T: type) type {
+    return struct {
+        const NoopError = error{Noop};
+        const Self = @This();
+
+        usingnamespace Read(T, NoopError);
+        usingnamespace Write(NoopError);
+
+        fn read(self: *Self) PollRead {
+            return PollRead{ .Ready = NoopError.Noop };
+        }
+
+        fn write(self: *Self, value: isize) PollWrite {
+            return PollWrite{ .Ready = NoopError.Noop };
+        }
     };
 }
 
